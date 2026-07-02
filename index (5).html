@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0b0d12">
+<title>MNEMO — AI Memory Manager</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" href="./icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d12; --bg2:#11141b; --bg3:#171b24; --bg4:#1d2230;
+  --border:#262b38; --mid:#454e63; --text:#e8eaf0; --text-dim:#8b93a8;
+  --white:#ffffff; --accent:#6e8bff; --accent-hover:#8aa0ff; --accent-soft:#1c2440;
+  --danger:#f0648c; --success:#2ecc71;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; padding:0; background:var(--bg); color:var(--text); height:100%; overflow:hidden;}
+body{font-family:"Noto Sans Thai","Inter",sans-serif; font-size:14px; line-height:1.5;}
+h1,h2,h3,.disp{font-family:"Chakra Petch","Noto Sans Thai",sans-serif; letter-spacing:.02em;}
+button{font-family:inherit;}
+#app{position:fixed; inset:0; display:flex; flex-direction:column;}
+
+/* ── HEADER ─────────────────────────────────────────────────── */
+#header{
+  padding: calc(var(--safe-top) + 14px) 18px 12px 18px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border); background:var(--bg2); flex:0 0 auto;
+}
+#header .brand{display:flex; align-items:center; gap:10px;}
+#header .glyph{width:26px; height:26px; color:var(--accent);}
+#header h1{font-size:17px; font-weight:600; color:var(--white); margin:0;}
+#sync-dot{width:9px; height:9px; border-radius:50%; background:var(--mid); flex:0 0 auto;
+  transition:background .3s; box-shadow:0 0 0 0 rgba(110,139,255,.5);}
+#sync-dot.ok{background:var(--success);}
+#sync-dot.busy{background:var(--accent); animation:pulse 1s infinite;}
+#sync-dot.err{background:var(--danger);}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(110,139,255,.55);}70%{box-shadow:0 0 0 7px rgba(110,139,255,0);}100%{box-shadow:0 0 0 0 rgba(110,139,255,0);}}
+
+/* ── MAIN VIEWS ─────────────────────────────────────────────── */
+#main{flex:1 1 auto; overflow-y:auto; position:relative; -webkit-overflow-scrolling:touch;}
+.view{display:none; padding:14px 16px calc(96px + var(--safe-bottom)) 16px; animation:fadein .18s ease;}
+.view.active{display:block;}
+@keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+.section-label{font-size:11px; letter-spacing:.12em; color:var(--text-dim); text-transform:uppercase; margin:18px 2px 8px 2px; font-family:"Chakra Petch";}
+.section-label:first-child{margin-top:2px;}
+
+/* search */
+#search-box{position:sticky; top:0; z-index:5; background:var(--bg); padding-bottom:10px;}
+.input, textarea.input, select.input{
+  width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  border-radius:10px; padding:11px 13px; font-size:14px; font-family:inherit; outline:none;
+}
+.input:focus{border-color:var(--accent);}
+.chip-row{display:flex; gap:8px; overflow-x:auto; padding:10px 0 2px 0; scrollbar-width:none;}
+.chip-row::-webkit-scrollbar{display:none;}
+.chip{flex:0 0 auto; padding:6px 13px; border-radius:20px; border:1px solid var(--border); background:var(--bg3);
+  color:var(--text-dim); font-size:12.5px; white-space:nowrap; cursor:pointer;}
+.chip.active{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-hover);}
+
+/* memory card */
+.card{background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:14px 15px; margin-bottom:10px; position:relative;}
+.card .top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;}
+.card .cat{font-size:11px; color:var(--accent-hover); font-family:"Chakra Petch"; letter-spacing:.04em;}
+.card .date{font-size:10.5px; color:var(--text-dim); flex:0 0 auto;}
+.card .title{font-weight:600; color:var(--white); font-size:14.5px; margin-bottom:3px;}
+.card .content{color:var(--text-dim); font-size:13px; white-space:pre-wrap; word-break:break-word;}
+.card .tags{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;}
+.card .tag{font-size:10.5px; color:var(--accent-hover); background:var(--accent-soft); padding:2px 8px; border-radius:8px;}
+.card .stars{color:var(--accent); font-size:11px; letter-spacing:1px;}
+.card img.thumb{max-width:100%; border-radius:10px; margin-top:8px; display:block;}
+.empty{text-align:center; color:var(--text-dim); padding:60px 20px; font-size:13px;}
+.empty .glyph{font-size:34px; color:var(--mid); margin-bottom:10px; display:block;}
+
+/* memory web canvas */
+#web-wrap{position:relative; height:calc(100vh - 210px - var(--safe-top) - var(--safe-bottom)); border-radius:14px; overflow:hidden; background:var(--bg2); border:1px solid var(--border); touch-action:none;}
+#web-canvas{width:100%; height:100%; display:block;}
+#web-hint{position:absolute; bottom:10px; left:10px; right:10px; font-size:11px; color:var(--text-dim); background:rgba(11,13,18,.7); padding:6px 10px; border-radius:8px; pointer-events:none;}
+#web-toolbar{display:flex; gap:8px; margin-top:10px;}
+.iconbtn{flex:0 0 auto; width:38px; height:38px; border-radius:10px; background:var(--bg3); border:1px solid var(--border); color:var(--text-dim); display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer;}
+
+/* chat */
+#chat-log{display:flex; flex-direction:column; gap:10px; padding-bottom:10px;}
+.msg{max-width:82%; padding:10px 13px; border-radius:14px; font-size:13.5px; white-space:pre-wrap; word-break:break-word;}
+.msg.user{align-self:flex-end; background:var(--accent); color:#0b0d12; border-radius:14px 14px 4px 14px;}
+.msg.ai{align-self:flex-start; background:var(--bg3); border:1px solid var(--border); border-radius:14px 14px 14px 4px;}
+.msg.sys{align-self:center; color:var(--text-dim); font-size:11.5px; background:none;}
+#chat-input-row{position:fixed; left:0; right:0; bottom:calc(64px + var(--safe-bottom)); padding:8px 12px; display:flex; gap:8px; background:linear-gradient(to top, var(--bg) 60%, transparent);}
+#chat-input-row.hidden{display:none;}
+#chat-input{flex:1;}
+.sendbtn,.mic-btn{width:42px; height:42px; border-radius:12px; background:var(--accent); border:none; color:#0b0d12; font-size:16px; flex:0 0 auto;}
+.mic-btn{background:var(--bg3); color:var(--text-dim); border:1px solid var(--border);}
+.mic-btn.recording{background:var(--danger); color:white; border-color:var(--danger);}
+
+/* settings */
+.field{margin-bottom:14px;}
+.field label{display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:5px; letter-spacing:.03em;}
+.hint{font-size:11px; color:var(--text-dim); margin-top:5px; line-height:1.5;}
+.btn{background:var(--accent); color:#0b0d12; border:none; border-radius:10px; padding:11px 16px; font-size:13.5px; font-weight:600; cursor:pointer;}
+.btn.ghost{background:transparent; color:var(--text-dim); border:1px solid var(--border);}
+.btn.danger{background:var(--danger); color:white;}
+.btn.block{width:100%;}
+.row{display:flex; gap:10px;}
+.row > *{flex:1;}
+.status-line{font-size:12px; margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--bg3);}
+.status-line.ok{color:var(--success);}
+.status-line.err{color:var(--danger);}
+.divider{height:1px; background:var(--border); margin:20px 0;}
+.switch-row{display:flex; align-items:center; justify-content:space-between; padding:2px 0;}
+.switch{position:relative; width:44px; height:26px; background:var(--bg4); border-radius:14px; border:1px solid var(--border); cursor:pointer; flex:0 0 auto;}
+.switch.on{background:var(--accent-soft); border-color:var(--accent);}
+.switch .knob{position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:var(--text-dim); transition:transform .15s, background .15s;}
+.switch.on .knob{transform:translateX(18px); background:var(--accent);}
+
+/* bottom nav */
+#nav{position:fixed; left:0; right:0; bottom:0; height:calc(64px + var(--safe-bottom)); padding-bottom:var(--safe-bottom);
+  background:var(--bg2); border-top:1px solid var(--border); display:flex; z-index:20;}
+.navbtn{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  color:var(--text-dim); background:none; border:none; font-size:10.5px; font-family:"Chakra Petch"; cursor:pointer;}
+.navbtn .ic{font-size:19px; line-height:1;}
+.navbtn.active{color:var(--accent-hover);}
+
+/* fab */
+#fab{position:fixed; right:18px; bottom:calc(80px + var(--safe-bottom)); width:56px; height:56px; border-radius:18px;
+  background:var(--accent); color:#0b0d12; font-size:26px; border:none; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 8px 20px rgba(110,139,255,.35); z-index:15;}
+#fab.hidden{display:none;}
+
+/* sheet / modal */
+#sheet-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:30; display:none;}
+#sheet-backdrop.show{display:block;}
+#sheet{position:fixed; left:0; right:0; bottom:0; max-height:88vh; background:var(--bg2); border-radius:20px 20px 0 0;
+  border-top:1px solid var(--border); z-index:31; transform:translateY(100%); transition:transform .22s ease; overflow-y:auto;
+  padding: 16px 18px calc(24px + var(--safe-bottom)) 18px;}
+#sheet.show{transform:translateY(0);}
+#sheet .handle{width:38px; height:4px; background:var(--mid); border-radius:3px; margin:0 auto 14px auto;}
+#sheet h2{font-size:16px; margin:0 0 14px 0; color:var(--white);}
+.imp-select{display:flex; gap:6px;}
+.imp-select .star{flex:1; text-align:center; padding:9px 0; border-radius:8px; background:var(--bg3); border:1px solid var(--border); color:var(--text-dim); cursor:pointer; font-size:15px;}
+.imp-select .star.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent);}
+.tagbox{display:flex; flex-wrap:wrap; gap:6px; padding:8px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; min-height:44px;}
+.tagbox .tagchip{background:var(--accent-soft); color:var(--accent-hover); font-size:12px; padding:4px 9px; border-radius:8px; display:flex; align-items:center; gap:5px;}
+.tagbox .tagchip span.x{cursor:pointer; opacity:.7;}
+.tagbox input{flex:1; min-width:60px; background:none; border:none; color:var(--text); outline:none; font-size:13px;}
+.attach-row{display:flex; gap:8px; margin-top:8px;}
+.attach-row .iconbtn{flex:1; width:auto; gap:6px; font-size:12px;}
+#ocr-progress{font-size:11px; color:var(--accent-hover); margin-top:6px;}
+#image-preview{max-width:100%; border-radius:10px; margin-top:8px; display:none;}
+
+/* toast */
+#toast{position:fixed; top:calc(var(--safe-top) + 62px); left:50%; transform:translateX(-50%) translateY(-10px); opacity:0;
+  background:var(--bg4); border:1px solid var(--border); color:var(--text); padding:9px 16px; border-radius:10px;
+  font-size:12.5px; z-index:50; transition:opacity .2s, transform .2s; pointer-events:none; max-width:88vw; text-align:center;}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+/* scrollbars minimal */
+::-webkit-scrollbar{width:0; height:0;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <div class="brand">
+      <svg class="glyph" viewBox="0 0 24 24" fill="none"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="2.2" r="1.3" fill="currentColor"/><circle cx="20.6" cy="7.2" r="1.3" fill="currentColor"/><circle cx="20.6" cy="16.8" r="1.3" fill="currentColor"/><circle cx="12" cy="21.8" r="1.3" fill="currentColor"/><circle cx="3.4" cy="16.8" r="1.3" fill="currentColor"/><circle cx="3.4" cy="7.2" r="1.3" fill="currentColor"/></svg>
+      <h1>MNEMO</h1>
+    </div>
+    <div id="sync-dot" title="สถานะซิงค์"></div>
+  </div>
+
+  <div id="main">
+
+    <!-- TIMELINE -->
+    <section class="view active" id="view-timeline">
+      <div class="chip-row" id="cat-filter-row"></div>
+      <div class="section-label">เส้นเวลาความทรงจำ</div>
+      <div id="timeline-list"></div>
+    </section>
+
+    <!-- SEARCH -->
+    <section class="view" id="view-search">
+      <div id="search-box">
+        <input class="input" id="search-input" placeholder="ค้นหาความทรงจำ… (ชื่อ / เนื้อหา / แท็ก)">
+      </div>
+      <div id="search-results"></div>
+    </section>
+
+    <!-- MEMORY WEB -->
+    <section class="view" id="view-web">
+      <div id="web-wrap">
+        <canvas id="web-canvas"></canvas>
+        <div id="web-hint">ลากโหนดเพื่อจัด • ลากทับกันเพื่อเชื่อมโยง • บีบสองนิ้วเพื่อซูม • แตะเพื่อดูรายละเอียด</div>
+      </div>
+      <div id="web-toolbar">
+        <div class="iconbtn" onclick="webZoom(1.2)">＋</div>
+        <div class="iconbtn" onclick="webZoom(0.8)">－</div>
+        <div class="iconbtn" onclick="webResetView()">⟲</div>
+      </div>
+    </section>
+
+    <!-- CHAT -->
+    <section class="view" id="view-chat">
+      <div id="chat-log"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="view-settings">
+      <div class="section-label" style="margin-top:0;">ติดตั้งแอป</div>
+      <div id="install-row" style="display:none;">
+        <div class="hint" style="margin-bottom:10px;">ติดตั้ง MNEMO ลงหน้าจอหลัก เปิดใช้งานได้เหมือนแอปทั่วไป ไม่ต้องเปิดผ่านเบราว์เซอร์</div>
+        <button class="btn block" id="install-btn" onclick="installApp()">⬇ ติดตั้งลงเครื่อง</button>
+      </div>
+      <div id="install-ios-hint" class="hint" style="display:none; margin-bottom:14px;">
+        เบราว์เซอร์นี้ไม่รองรับการติดตั้งอัตโนมัติ — บน iPhone/iPad: กดปุ่ม แชร์ (⬆️) ใน Safari แล้วเลือก "เพิ่มไปยังหน้าจอโฮม"
+      </div>
+      <div id="install-done-hint" class="hint" style="display:none; margin-bottom:14px;">✓ ติดตั้งแอปนี้ไว้แล้ว</div>
+      <div class="divider"></div>
+
+      <div class="section-label" style="margin-top:0;">GitHub Sync</div>
+      <div class="switch-row">
+        <div>เปิดใช้งานซิงค์ผ่าน GitHub</div>
+        <div class="switch" id="sw-github" onclick="toggleSwitch('sw-github')"></div>
+      </div>
+      <div class="hint" style="margin-bottom:14px;">ข้อมูลจะถูกเก็บเป็นไฟล์ JSON ใน repo ที่ path <code>mnemo_data/</code> — ไฟล์เดียวกันกับที่โปรแกรมบนคอมพิวเตอร์ใช้</div>
+      <div class="field">
+        <label>Repository (owner/repo)</label>
+        <input class="input" id="cfg-repo" placeholder="quillmist/mnemo-data">
+      </div>
+      <div class="field">
+        <label>Personal Access Token (สิทธิ์ Contents: Read & Write)</label>
+        <input class="input" id="cfg-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+      </div>
+      <div class="field">
+        <label>Branch</label>
+        <input class="input" id="cfg-branch" placeholder="main" value="main">
+      </div>
+      <div class="row">
+        <button class="btn ghost" onclick="testGithub()">ทดสอบการเชื่อมต่อ</button>
+        <button class="btn ghost" onclick="manualSync()">ซิงค์เดี๋ยวนี้</button>
+      </div>
+      <div id="github-status" class="status-line" style="display:none;"></div>
+
+      <div class="divider"></div>
+      <div class="section-label" style="margin-top:0;">Groq API (สำหรับแชท AI)</div>
+      <div class="field">
+        <label>Groq API Key</label>
+        <input class="input" id="cfg-groq" type="password" placeholder="gsk_xxxxxxxxxxxx">
+      </div>
+      <div class="hint">คีย์เดียวกับที่ตั้งไว้ในโปรแกรมบนคอมพิวเตอร์ได้ (Settings → GROQ API KEYS)</div>
+
+      <div class="divider"></div>
+      <div class="section-label" style="margin-top:0;">เสียง (Voice)</div>
+      <div class="switch-row">
+        <div>อ่านคำตอบ AI ออกเสียงอัตโนมัติ</div>
+        <div class="switch" id="sw-tts" onclick="toggleSwitch('sw-tts')"></div>
+      </div>
+      <div class="hint">ใช้เสียงสังเคราะห์ของเบราว์เซอร์/มือถือ (ไม่ใช่ edge-tts เหมือนเดสก์ท็อป เพราะเบราว์เซอร์เข้าถึงได้แค่นี้)</div>
+
+      <div class="divider"></div>
+      <button class="btn block" onclick="saveSettings()">บันทึกการตั้งค่า</button>
+      <div id="settings-saved" class="status-line ok" style="display:none;">✓ บันทึกแล้ว</div>
+
+      <div class="divider"></div>
+      <div class="section-label" style="margin-top:0;">ความปลอดภัยของข้อมูล</div>
+      <div class="hint" style="margin-bottom:10px;">ระบบสำรองข้อมูลอัตโนมัติในเครื่องนี้ไว้ก่อนดึงข้อมูลใหม่ทุกครั้ง (เก็บย้อนหลัง 5 ชุดล่าสุด) เผื่อกรณีข้อมูลรีโมทผิดพลาดหรือดึงมาผิดจังหวะ</div>
+      <div class="row">
+        <button class="btn ghost" onclick="showBackupList()">กู้คืนจากสำรองในเครื่อง</button>
+        <button class="btn ghost" onclick="exportDataFile()">ดาวน์โหลดสำรอง (.json)</button>
+      </div>
+      <div id="backup-list" style="display:none; margin-top:10px;"></div>
+      <div class="hint" style="margin-top:10px;">แนะนำให้กด "ดาวน์โหลดสำรอง" เก็บไว้เป็นระยะ โดยเฉพาะก่อนเปลี่ยนการตั้งค่า sync หรือย้ายเครื่อง</div>
+
+      <div class="divider"></div>
+      <div class="hint">MNEMO Mobile • เชื่อมข้อมูลกับเวอร์ชันเดสก์ท็อปผ่าน GitHub repo เดียวกัน</div>
+    </section>
+
+  </div>
+
+  <button id="fab" onclick="openAddSheet()">+</button>
+
+  <div id="chat-input-row" class="hidden">
+    <button class="mic-btn" id="chat-mic-btn" onclick="toggleChatMic()">🎤</button>
+    <input class="input" id="chat-input" placeholder="พิมพ์ข้อความ…">
+    <button class="sendbtn" onclick="sendChat()">➤</button>
+  </div>
+
+  <div id="nav">
+    <button class="navbtn active" data-view="timeline" onclick="showView('timeline')"><span class="ic">◷</span>เส้นเวลา</button>
+    <button class="navbtn" data-view="search" onclick="showView('search')"><span class="ic">⌕</span>ค้นหา</button>
+    <button class="navbtn" data-view="web" onclick="showView('web')"><span class="ic">⬡</span>เว็บความจำ</button>
+    <button class="navbtn" data-view="chat" onclick="showView('chat')"><span class="ic">◈</span>แชท AI</button>
+    <button class="navbtn" data-view="settings" onclick="showView('settings')"><span class="ic">⚙</span>ตั้งค่า</button>
+  </div>
+</div>
+
+<div id="sheet-backdrop" onclick="closeSheet()"></div>
+<div id="sheet">
+  <div class="handle"></div>
+  <h2 id="sheet-title">บันทึกความทรงจำใหม่</h2>
+
+  <div class="field">
+    <label>เนื้อหา</label>
+    <textarea class="input" id="f-content" rows="4" placeholder="พิมพ์หรือพูดสิ่งที่อยากจดจำ…"></textarea>
+    <div class="attach-row">
+      <div class="iconbtn" onclick="document.getElementById('f-image').click()">📷 แนบรูป / OCR</div>
+      <div class="iconbtn" id="voice-dictate-btn" onclick="toggleDictateMic()">🎤 พูดเพื่อพิมพ์</div>
+    </div>
+    <input type="file" id="f-image" accept="image/*" capture="environment" style="display:none" onchange="handleImagePick(event)">
+    <div id="ocr-progress"></div>
+    <img id="image-preview">
+  </div>
+
+  <div class="field">
+    <label>หัวข้อ (ไม่บังคับ — ถ้าเว้นว่างจะตัดจากเนื้อหา)</label>
+    <input class="input" id="f-title" placeholder="หัวข้อสั้น ๆ">
+  </div>
+
+  <div class="field">
+    <label>หมวดหมู่</label>
+    <select class="input" id="f-category"></select>
+  </div>
+
+  <div class="field">
+    <label>แท็ก</label>
+    <div class="tagbox" id="f-tagbox" onclick="document.getElementById('f-tag-input').focus()">
+      <input id="f-tag-input" placeholder="พิมพ์แท็กแล้ว Enter">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>ความสำคัญ</label>
+    <div class="imp-select" id="f-importance"></div>
+  </div>
+
+  <div class="row" style="margin-top:16px;">
+    <button class="btn ghost" onclick="closeSheet()">ยกเลิก</button>
+    <button class="btn" onclick="saveMemoryFromSheet()">บันทึก</button>
+  </div>
+  <div id="sheet-delete-row" class="row" style="margin-top:10px; display:none;">
+    <button class="btn danger block" onclick="deleteCurrentMemory()">ลบความทรงจำนี้</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   MNEMO MOBILE — โครงข้อมูล / GitHub sync / UI ทั้งหมดอยู่ในไฟล์เดียว
+   ══════════════════════════════════════════════════════════════════════ */
+
+const BASE_CATEGORIES = {
+  work:     "⬡ WORK",
+  personal: "◈ PERSONAL",
+  idea:     "◆ IDEA",
+  health:   "○ HEALTH",
+  finance:  "◇ FINANCE",
+  social:   "◉ SOCIAL",
+  learning: "▣ LEARNING",
+  other:    "□ OTHER",
+};
+const DATA_PREFIX = "mnemo_data";
+const DATA_FILES = ["memories.json","categories.json","links.json","trash.json"];
+
+let CFG = loadLocal("mnemo_mobile_config", {github_token:"", github_repo:"", github_branch:"main", groq_key:"", tts_enabled:false});
+let DATA = loadLocal("mnemo_mobile_data", {memories:[], categories:{}, links:[], trash:[], meta:{updated_at:""}});
+let currentEditId = null;
+let currentTags = [];
+let currentImportance = 3;
+let currentImageData = null;
+let currentView = "timeline";
+let catFilter = "all";
+let pushTimer = null;
+
+function loadLocal(key, fallback){
+  try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; }
+}
+function saveLocal(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){} }
+function saveData(){ DATA._dirty = true; saveLocal("mnemo_mobile_data", DATA); schedulePush(); }
+function saveConfig(){ saveLocal("mnemo_mobile_config", CFG); }
+
+/* ── LOCAL SAFETY BACKUPS ────────────────────────────────────────────
+   ก่อนที่จะเขียนทับ DATA ทั้งก้อน (เช่นตอน pull จาก GitHub) ให้สำรอง
+   ข้อมูลปัจจุบันไว้ใน localStorage เก็บย้อนหลังไว้ 5 ชุด กันกรณี pull
+   ผิดจังหวะ/ข้อมูลบนรีโมทเพี้ยน/สูญหาย จะได้กู้คืนจากเครื่องนี้ได้ */
+const LOCAL_BACKUP_KEY = "mnemo_mobile_backups";
+const LOCAL_BACKUP_KEEP = 5;
+function snapshotLocalBackup(reason){
+  try{
+    const backups = loadLocal(LOCAL_BACKUP_KEY, []);
+    backups.push({ ts: new Date().toISOString(), reason: reason || "", data: DATA });
+    while(backups.length > LOCAL_BACKUP_KEEP) backups.shift();
+    saveLocal(LOCAL_BACKUP_KEY, backups);
+  }catch(e){ console.warn("snapshot backup failed", e); }
+}
+function listLocalBackups(){
+  return loadLocal(LOCAL_BACKUP_KEY, []);
+}
+function restoreLocalBackup(index){
+  const backups = loadLocal(LOCAL_BACKUP_KEY, []);
+  const b = backups[index];
+  if(!b) return false;
+  // สำรองสถานะปัจจุบันไว้ก่อน กันพลาดกู้ผิดชุด
+  snapshotLocalBackup("ก่อนกู้คืนจากสำรอง");
+  DATA = b.data;
+  DATA._dirty = true; // ต้อง push ทับรีโมทหลังกู้คืน ผู้ใช้ต้องกด sync เอง
+  saveLocal("mnemo_mobile_data", DATA);
+  return true;
+}
+
+function showBackupList(){
+  const el = document.getElementById("backup-list");
+  const backups = listLocalBackups();
+  if(!backups.length){
+    el.style.display = "block";
+    el.innerHTML = '<div class="hint">ยังไม่มีข้อมูลสำรองในเครื่องนี้ (จะสร้างอัตโนมัติทุกครั้งที่ดึงข้อมูลใหม่จาก GitHub)</div>';
+    return;
+  }
+  el.style.display = "block";
+  el.innerHTML = backups.slice().reverse().map((b, revIdx) => {
+    const idx = backups.length - 1 - revIdx;
+    const count = (b.data.memories||[]).length;
+    const d = new Date(b.ts);
+    const label = d.toLocaleString("th-TH");
+    return `<div class="status-line" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <div>${escapeHtml(label)}<br><span class="hint" style="margin:0;">${escapeHtml(b.reason||"")} • ${count} รายการ</span></div>
+      <button class="btn ghost" onclick="confirmRestoreBackup(${idx})">กู้คืน</button>
+    </div>`;
+  }).join("");
+}
+function confirmRestoreBackup(index){
+  if(!confirm("กู้คืนข้อมูลชุดนี้จะแทนที่ข้อมูลปัจจุบันในเครื่องนี้ (สถานะปัจจุบันจะถูกสำรองไว้ก่อนด้วย)\nดำเนินการต่อหรือไม่?")) return;
+  if(restoreLocalBackup(index)){
+    toast("กู้คืนข้อมูลแล้ว — อย่าลืมกด 'ซิงค์เดี๋ยวนี้' ถ้าต้องการอัปขึ้น GitHub ด้วย");
+    showBackupList();
+    refreshCurrentView();
+  } else {
+    toast("กู้คืนไม่สำเร็จ");
+  }
+}
+
+function exportDataFile(){
+  try{
+    const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g,"-");
+    a.href = url; a.download = `mnemo-backup-${stamp}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("ดาวน์โหลดไฟล์สำรองแล้ว");
+  }catch(e){
+    toast("ดาวน์โหลดไม่สำเร็จ: " + e.message);
+  }
+}
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+function escapeHtml(s){
+  return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ── base64 <-> utf8 (รองรับภาษาไทย) ─────────────────────────────────── */
+function b64EncodeUtf8(str){
+  return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
+}
+function b64DecodeUtf8(str){
+  const bin = atob(str.replace(/\n/g,""));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+/* ══════════════════════════════ GITHUB SYNC ══════════════════════════ */
+function ghConfigured(){ return !!(CFG.github_sync_enabled && CFG.github_token && CFG.github_repo); }
+function ghApiBase(){
+  const [owner, repo] = CFG.github_repo.split("/");
+  return `https://api.github.com/repos/${owner}/${(repo||"").trim()}/contents`;
+}
+function ghHeaders(){
+  return { "Authorization": `Bearer ${CFG.github_token}`, "Accept": "application/vnd.github+json" };
+}
+async function ghGetFile(path){
+  const branch = CFG.github_branch || "main";
+  const res = await fetch(`${ghApiBase()}/${path}?ref=${encodeURIComponent(branch)}`, { headers: ghHeaders() });
+  if(res.status === 200){
+    const j = await res.json();
+    return { content: b64DecodeUtf8(j.content), sha: j.sha };
+  }
+  if(res.status === 404) return { content: null, sha: null };
+  throw new Error(`GET ${path} → ${res.status}`);
+}
+async function ghPutFile(path, contentStr, message, sha){
+  const body = { message, content: b64EncodeUtf8(contentStr), branch: CFG.github_branch || "main" };
+  if(sha) body.sha = sha;
+  const res = await fetch(`${ghApiBase()}/${path}`, { method:"PUT", headers:{...ghHeaders(), "Content-Type":"application/json"}, body: JSON.stringify(body) });
+  if(res.status === 200 || res.status === 201) return (await res.json()).content.sha;
+  const errText = await res.text();
+  throw new Error(`PUT ${path} → ${res.status} ${errText.slice(0,150)}`);
+}
+
+function setSyncDot(state){
+  const dot = document.getElementById("sync-dot");
+  dot.className = state; // '', 'ok', 'busy', 'err'
+}
+
+async function pullIfNewer(){
+  if(!ghConfigured()) return false;
+  setSyncDot("busy");
+  try{
+    const remoteMeta = await ghGetFile(`${DATA_PREFIX}/meta.json`);
+    if(!remoteMeta.content){ setSyncDot(""); return false; }
+    const meta = JSON.parse(remoteMeta.content);
+    if((meta.updated_at||"") <= (DATA.meta.updated_at||"")){ setSyncDot("ok"); return false; }
+
+    // ป้องกันข้อมูลหาย: ถ้าเครื่องนี้มีการแก้ไขที่ยังไม่ทัน push ขึ้น GitHub
+    // (schedulePush ตั้งคิวไว้ หรือ flag _dirty ยังไม่ถูกเคลียร์) ให้เตือนก่อน
+    // แล้วดัน push ของเราขึ้นก่อน หรือให้ผู้ใช้ตัดสินใจ แทนที่จะเขียนทับเงียบ ๆ
+    if(DATA._dirty || pushTimer){
+      const proceed = confirm(
+        "เครื่องนี้มีการแก้ไขที่ยังไม่ได้ซิงค์ขึ้น GitHub\n" +
+        "ถ้าดึงข้อมูลใหม่ตอนนี้ การแก้ไขล่าสุดในเครื่องอาจถูกแทนที่\n\n" +
+        "กด OK เพื่อ 'ซิงค์ขึ้นก่อน' (แนะนำ) หรือ Cancel เพื่อยกเลิกการดึงข้อมูลรอบนี้"
+      );
+      if(proceed){
+        clearTimeout(pushTimer); pushTimer = null;
+        await doPush();
+      }
+      setSyncDot("");
+      return false;
+    }
+
+    // สำรองข้อมูลปัจจุบันของเครื่องนี้ไว้ก่อนเขียนทับเสมอ
+    snapshotLocalBackup(`ก่อน pull จาก GitHub (${meta.device||"?"})`);
+
+    const next = { memories:[], categories:{}, links:[], trash:[], meta };
+    let fetchFailed = false;
+    for(const fname of DATA_FILES){
+      const f = await ghGetFile(`${DATA_PREFIX}/${fname}`);
+      const key = fname.replace(".json","");
+      if(f.content !== null){
+        try{ next[key] = JSON.parse(f.content); }
+        catch(e){ fetchFailed = true; next[key] = DATA[key]; }
+      } else {
+        next[key] = DATA[key];
+      }
+    }
+    if(fetchFailed){
+      // ไฟล์รีโมทอ่าน/parse ไม่ได้บางไฟล์ — อย่าเขียนทับด้วยข้อมูลครึ่ง ๆ กลาง ๆ
+      setSyncDot("err");
+      toast("ข้อมูลบางส่วนจาก GitHub อ่านไม่ได้ — ยกเลิกการดึงข้อมูลรอบนี้เพื่อความปลอดภัย");
+      return false;
+    }
+    DATA = next;
+    DATA._dirty = false;
+    saveLocal("mnemo_mobile_data", DATA);
+    setSyncDot("ok");
+    toast(`ดึงข้อมูลล่าสุดจาก GitHub แล้ว (จาก: ${meta.device||"?"})`);
+    return true;
+  }catch(e){
+    console.warn("pull failed", e);
+    setSyncDot("err");
+    return false;
+  }
+}
+
+function schedulePush(){
+  if(!ghConfigured()) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(doPush, 2500);
+}
+
+async function doPush(){
+  if(!ghConfigured()) return false;
+  setSyncDot("busy");
+  clearTimeout(pushTimer); pushTimer = null;
+  try{
+    // เช็ค meta ของรีโมทก่อน — ถ้ามีเครื่องอื่น push ใหม่กว่าที่เรารู้จัก
+    // ให้หยุดและแจ้งเตือนแทนที่จะเขียนทับข้อมูลของเครื่องนั้นแบบเงียบ ๆ
+    const remoteMetaCheck = await ghGetFile(`${DATA_PREFIX}/meta.json`);
+    if(remoteMetaCheck.content){
+      const remoteMeta = JSON.parse(remoteMetaCheck.content);
+      if((remoteMeta.updated_at||"") > (DATA.meta.updated_at||"")){
+        setSyncDot("err");
+        const proceed = confirm(
+          `มีข้อมูลใหม่กว่าบน GitHub (จากเครื่อง: ${remoteMeta.device||"?"}) ที่เรายังไม่ได้ดึงมา\n` +
+          "ถ้า push ทับตอนนี้ อาจทำให้ข้อมูลจากเครื่องนั้นหาย\n\n" +
+          "กด OK เพื่อดึงข้อมูลใหม่มาก่อน (แนะนำ) หรือ Cancel เพื่อยกเลิก push รอบนี้"
+        );
+        if(proceed) await pullIfNewer();
+        return false;
+      }
+    }
+
+    for(const fname of DATA_FILES){
+      const key = fname.replace(".json","");
+      const remote = await ghGetFile(`${DATA_PREFIX}/${fname}`);
+      await ghPutFile(`${DATA_PREFIX}/${fname}`, JSON.stringify(DATA[key], null, 2), `MNEMO mobile sync: ${fname}`, remote.sha);
+    }
+    const now = new Date().toISOString();
+    const meta = { updated_at: now, device: "mobile" };
+    const remoteMeta = await ghGetFile(`${DATA_PREFIX}/meta.json`);
+    await ghPutFile(`${DATA_PREFIX}/meta.json`, JSON.stringify(meta), "MNEMO mobile sync: meta", remoteMeta.sha);
+    DATA.meta = meta;
+    DATA._dirty = false;
+    saveLocal("mnemo_mobile_data", DATA);
+    setSyncDot("ok");
+    return true;
+  }catch(e){
+    console.warn("push failed", e);
+    setSyncDot("err");
+    toast("ซิงค์ล้มเหลว — จะลองใหม่ครั้งถัดไป");
+    return false;
+  }
+}
+
+async function testGithub(){
+  const el = document.getElementById("github-status");
+  el.style.display = "block"; el.className = "status-line"; el.textContent = "กำลังทดสอบ...";
+  const token = document.getElementById("cfg-token").value.trim();
+  const repo = document.getElementById("cfg-repo").value.trim();
+  const branch = document.getElementById("cfg-branch").value.trim() || "main";
+  if(!token || !repo.includes("/")){
+    el.className = "status-line err"; el.textContent = "กรอก repo (owner/repo) และ token ให้ครบก่อน"; return;
+  }
+  try{
+    const [owner, name] = repo.split("/");
+    const res = await fetch(`https://api.github.com/repos/${owner}/${name}`, { headers:{ "Authorization": `Bearer ${token}`, "Accept":"application/vnd.github+json" } });
+    if(res.status === 200){
+      const j = await res.json();
+      el.className = "status-line ok";
+      el.textContent = `เชื่อมต่อสำเร็จ ✓ (${owner}/${name}, ${j.private?"private":"public"}, branch: ${branch})`;
+    }else if(res.status === 404){
+      el.className = "status-line err"; el.textContent = "ไม่พบ repo นี้ — ตรวจชื่อ owner/repo";
+    }else if(res.status === 401){
+      el.className = "status-line err"; el.textContent = "Token ไม่ถูกต้องหรือหมดอายุ";
+    }else{
+      el.className = "status-line err"; el.textContent = `เชื่อมต่อล้มเหลว: ${res.status}`;
+    }
+  }catch(e){
+    el.className = "status-line err"; el.textContent = "เชื่อมต่อล้มเหลว: " + e.message;
+  }
+}
+
+async function manualSync(){
+  CFG.github_token = document.getElementById("cfg-token").value.trim();
+  CFG.github_repo = document.getElementById("cfg-repo").value.trim();
+  CFG.github_branch = document.getElementById("cfg-branch").value.trim() || "main";
+  saveConfig();
+  const el = document.getElementById("github-status");
+  el.style.display = "block"; el.className = "status-line"; el.textContent = "กำลังซิงค์...";
+  const ok = await doPush();
+  el.className = "status-line " + (ok ? "ok" : "err");
+  el.textContent = ok ? "✓ ซิงค์ขึ้น GitHub สำเร็จ" : "✗ ซิงค์ล้มเหลว — ตรวจสอบ repo/token/เน็ต";
+}
+
+/* ══════════════════════════════ NAV / VIEWS ══════════════════════════ */
+function showView(name){
+  currentView = name;
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById("view-"+name).classList.add("active");
+  document.querySelectorAll(".navbtn").forEach(b => b.classList.toggle("active", b.dataset.view===name));
+  document.getElementById("fab").classList.toggle("hidden", !(name==="timeline"||name==="search"));
+  document.getElementById("chat-input-row").classList.toggle("hidden", name!=="chat");
+  if(name==="timeline") renderTimeline();
+  if(name==="search") renderSearch();
+  if(name==="web") setTimeout(renderWeb, 30);
+  if(name==="chat") renderChat();
+  if(name==="settings") refreshInstallUI();
+}
+
+/* ══════════════════════════════ CATEGORIES ═══════════════════════════ */
+function allCategories(){ return {...BASE_CATEGORIES, ...(DATA.categories||{})}; }
+function catLabel(key){ return allCategories()[key] || "□ OTHER"; }
+
+function renderCatFilterRow(){
+  const cats = allCategories();
+  const row = document.getElementById("cat-filter-row");
+  let html = `<div class="chip ${catFilter==='all'?'active':''}" onclick="setCatFilter('all')">ทั้งหมด</div>`;
+  for(const [k,label] of Object.entries(cats)){
+    html += `<div class="chip ${catFilter===k?'active':''}" onclick="setCatFilter('${k}')">${escapeHtml(label)}</div>`;
+  }
+  row.innerHTML = html;
+}
+function setCatFilter(k){ catFilter = k; renderTimeline(); }
+
+/* ══════════════════════════════ TIMELINE / SEARCH ════════════════════ */
+function sortedMemories(){
+  return [...DATA.memories].sort((a,b) => (b.date||"").localeCompare(a.date||""));
+}
+
+function memoryCardHtml(m){
+  const stars = "★".repeat(m.importance||3) + "☆".repeat(5-(m.importance||3));
+  const tagsHtml = (m.tags||[]).map(t=>`<span class="tag">#${escapeHtml(t)}</span>`).join("");
+  const imgHtml = m.image_data ? `<img class="thumb" src="${m.image_data}">` : "";
+  return `<div class="card" onclick="openEditSheet(${m.id})">
+    <div class="top">
+      <span class="cat">${escapeHtml(catLabel(m.category))}</span>
+      <span class="date">${escapeHtml(m.date||"")}</span>
+    </div>
+    <div class="title">${escapeHtml(m.title || (m.content||"").slice(0,40))}</div>
+    <div class="content">${escapeHtml((m.content||"").slice(0,200))}${(m.content||"").length>200?"…":""}</div>
+    ${imgHtml}
+    <div class="tags">${tagsHtml}<span class="stars" style="margin-left:auto">${stars}</span></div>
+  </div>`;
+}
+
+function renderTimeline(){
+  renderCatFilterRow();
+  const list = sortedMemories().filter(m => catFilter==="all" || m.category===catFilter);
+  const el = document.getElementById("timeline-list");
+  if(list.length===0){
+    el.innerHTML = `<div class="empty"><span class="glyph">⬡</span>ยังไม่มีความทรงจำในหมวดนี้<br>แตะปุ่ม + เพื่อเริ่มบันทึก</div>`;
+    return;
+  }
+  el.innerHTML = list.map(memoryCardHtml).join("");
+}
+
+function renderSearch(){
+  const q = (document.getElementById("search-input").value||"").trim().toLowerCase();
+  const el = document.getElementById("search-results");
+  if(!q){ el.innerHTML = `<div class="empty"><span class="glyph">⌕</span>พิมพ์คำค้นหา…</div>`; return; }
+  const results = sortedMemories().filter(m => {
+    const hay = [m.title, m.content, (m.tags||[]).join(" "), catLabel(m.category)].join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+  if(results.length===0){ el.innerHTML = `<div class="empty">ไม่พบผลลัพธ์สำหรับ "${escapeHtml(q)}"</div>`; return; }
+  el.innerHTML = results.map(memoryCardHtml).join("");
+}
+document.getElementById("search-input").addEventListener("input", renderSearch);
+
+/* ══════════════════════════════ ADD / EDIT SHEET ═════════════════════ */
+function populateCategorySelect(selected){
+  const sel = document.getElementById("f-category");
+  sel.innerHTML = Object.entries(allCategories()).map(([k,l]) =>
+    `<option value="${k}" ${k===selected?"selected":""}>${escapeHtml(l)}</option>`
+  ).join("") + `<option value="__new__">+ สร้างหมวดหมู่ใหม่…</option>`;
+}
+document.getElementById("f-category").addEventListener("change", (e)=>{
+  if(e.target.value === "__new__"){
+    const name = prompt("ชื่อหมวดหมู่ใหม่ (ภาษาไทยหรืออังกฤษ):");
+    if(name && name.trim()){
+      const key = "custom_" + Date.now();
+      DATA.categories[key] = "✦ " + name.trim().toUpperCase();
+      saveData();
+      populateCategorySelect(key);
+    } else {
+      populateCategorySelect(Object.keys(allCategories())[0]);
+    }
+  }
+});
+
+function renderImportanceSelector(){
+  const el = document.getElementById("f-importance");
+  el.innerHTML = "";
+  for(let i=1;i<=5;i++){
+    const d = document.createElement("div");
+    d.className = "star" + (i<=currentImportance ? " on" : "");
+    d.textContent = "★";
+    d.onclick = () => { currentImportance = i; renderImportanceSelector(); };
+    el.appendChild(d);
+  }
+}
+
+function renderTagbox(){
+  const box = document.getElementById("f-tagbox");
+  const input = document.getElementById("f-tag-input");
+  box.querySelectorAll(".tagchip").forEach(c=>c.remove());
+  currentTags.forEach((t, i) => {
+    const chip = document.createElement("span");
+    chip.className = "tagchip";
+    chip.innerHTML = `${escapeHtml(t)} <span class="x" onclick="removeTag(${i})">✕</span>`;
+    box.insertBefore(chip, input);
+  });
+}
+function removeTag(i){ currentTags.splice(i,1); renderTagbox(); }
+document.getElementById("f-tag-input").addEventListener("keydown", (e) => {
+  if(e.key === "Enter" || e.key === ","){
+    e.preventDefault();
+    const v = e.target.value.trim().replace(/^#/,"");
+    if(v && !currentTags.includes(v)){ currentTags.push(v); renderTagbox(); }
+    e.target.value = "";
+  }
+});
+
+function openAddSheet(){
+  currentEditId = null;
+  currentTags = []; currentImportance = 3; currentImageData = null;
+  document.getElementById("sheet-title").textContent = "บันทึกความทรงจำใหม่";
+  document.getElementById("f-content").value = "";
+  document.getElementById("f-title").value = "";
+  document.getElementById("image-preview").style.display = "none";
+  document.getElementById("ocr-progress").textContent = "";
+  populateCategorySelect(Object.keys(allCategories())[0]);
+  renderImportanceSelector(); renderTagbox();
+  document.getElementById("sheet-delete-row").style.display = "none";
+  openSheet();
+}
+function openEditSheet(id){
+  const m = DATA.memories.find(x => x.id === id);
+  if(!m) return;
+  currentEditId = id;
+  currentTags = [...(m.tags||[])];
+  currentImportance = m.importance || 3;
+  currentImageData = m.image_data || null;
+  document.getElementById("sheet-title").textContent = "แก้ไขความทรงจำ";
+  document.getElementById("f-content").value = m.content || "";
+  document.getElementById("f-title").value = m.title || "";
+  const prev = document.getElementById("image-preview");
+  if(currentImageData){ prev.src = currentImageData; prev.style.display = "block"; } else { prev.style.display = "none"; }
+  document.getElementById("ocr-progress").textContent = "";
+  populateCategorySelect(m.category);
+  renderImportanceSelector(); renderTagbox();
+  document.getElementById("sheet-delete-row").style.display = "block";
+  openSheet();
+}
+function openSheet(){
+  document.getElementById("sheet-backdrop").classList.add("show");
+  document.getElementById("sheet").classList.add("show");
+}
+function closeSheet(){
+  document.getElementById("sheet-backdrop").classList.remove("show");
+  document.getElementById("sheet").classList.remove("show");
+  stopDictateMic();
+}
+
+function nextMobileId(){
+  // ใช้ timestamp (ms) เป็น id เพื่อไม่ชนกับ id แบบตัวเลขไล่ลำดับของเดสก์ท็อป
+  return Date.now();
+}
+
+function saveMemoryFromSheet(){
+  const content = document.getElementById("f-content").value.trim();
+  if(!content){ toast("กรุณาพิมพ์เนื้อหาก่อนบันทึก"); return; }
+  const title = document.getElementById("f-title").value.trim();
+  const category = document.getElementById("f-category").value;
+  const now = new Date();
+  const dateStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0") + "-" + String(now.getDate()).padStart(2,"0")
+    + " " + String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
+
+  if(currentEditId){
+    const m = DATA.memories.find(x => x.id === currentEditId);
+    if(m){
+      m.content = content; m.title = title || content.slice(0,40);
+      m.category = category; m.tags = [...currentTags]; m.importance = currentImportance;
+      if(currentImageData) m.image_data = currentImageData;
+    }
+  } else {
+    DATA.memories.push({
+      id: nextMobileId(), content, title: title || content.slice(0,40),
+      category, tags: [...currentTags], importance: currentImportance,
+      date: dateStr, image_data: currentImageData, source: "mobile",
+    });
+  }
+  saveData();
+  closeSheet();
+  toast("บันทึกแล้ว");
+  if(currentView==="timeline") renderTimeline();
+  if(currentView==="search") renderSearch();
+}
+
+function deleteCurrentMemory(){
+  if(!currentEditId) return;
+  if(!confirm("ย้ายความทรงจำนี้ไปถังขยะ?")) return;
+  const idx = DATA.memories.findIndex(x => x.id === currentEditId);
+  if(idx >= 0){
+    const [m] = DATA.memories.splice(idx, 1);
+    DATA.trash.push({ memory: m, deleted_at: new Date().toISOString() });
+  }
+  saveData();
+  closeSheet();
+  toast("ย้ายไปถังขยะแล้ว");
+  renderTimeline();
+}
+
+/* ── OCR (Tesseract.js) ────────────────────────────────────────────── */
+function handleImagePick(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    currentImageData = reader.result;
+    const prev = document.getElementById("image-preview");
+    prev.src = currentImageData; prev.style.display = "block";
+    const prog = document.getElementById("ocr-progress");
+    prog.textContent = "กำลังอ่านข้อความจากรูป (OCR)…";
+    try{
+      const result = await Tesseract.recognize(currentImageData, "tha+eng", {
+        logger: m => { if(m.status==="recognizing text") prog.textContent = `OCR: ${Math.round(m.progress*100)}%`; }
+      });
+      const text = (result.data.text||"").trim();
+      if(text){
+        const ta = document.getElementById("f-content");
+        ta.value = ta.value ? (ta.value + "\n" + text) : text;
+        prog.textContent = "✓ อ่านข้อความจากรูปเรียบร้อย";
+      } else {
+        prog.textContent = "ไม่พบข้อความในรูปนี้";
+      }
+    }catch(e){
+      prog.textContent = "OCR ล้มเหลว: " + e.message;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── Voice dictation (Web Speech API) — ใช้ในฟอร์มเพิ่มความทรงจำ ─────── */
+let dictateRecognition = null, dictateActive = false;
+function getSpeechRecognition(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return null;
+  const r = new SR();
+  r.lang = "th-TH"; r.continuous = true; r.interimResults = false;
+  return r;
+}
+function toggleDictateMic(){
+  if(dictateActive){ stopDictateMic(); return; }
+  dictateRecognition = getSpeechRecognition();
+  if(!dictateRecognition){ toast("เบราว์เซอร์นี้ไม่รองรับการพูดเพื่อพิมพ์"); return; }
+  dictateActive = true;
+  document.getElementById("voice-dictate-btn").style.color = "var(--danger)";
+  dictateRecognition.onresult = (e) => {
+    let text = "";
+    for(let i=e.resultIndex; i<e.results.length; i++) text += e.results[i][0].transcript;
+    const ta = document.getElementById("f-content");
+    ta.value = ta.value ? (ta.value + " " + text) : text;
+  };
+  dictateRecognition.onerror = () => stopDictateMic();
+  dictateRecognition.onend = () => { if(dictateActive){ try{ dictateRecognition.start(); }catch(e){} } };
+  try{ dictateRecognition.start(); toast("กำลังฟัง… พูดได้เลย"); }catch(e){ stopDictateMic(); }
+}
+function stopDictateMic(){
+  dictateActive = false;
+  document.getElementById("voice-dictate-btn").style.color = "";
+  if(dictateRecognition){ try{ dictateRecognition.stop(); }catch(e){} }
+}
+
+/* ══════════════════════════════ MEMORY WEB (canvas) ══════════════════ */
+let webNodes = [], webView = {x:0,y:0,scale:1}, webCanvas, webCtx;
+let webDrag = null, webPinch = null, webPan = null;
+
+function catColor(key){
+  const palette = { work:"#6e8bff", personal:"#f0648c", idea:"#2ecc71", health:"#facc5c",
+    finance:"#8aa0ff", social:"#e879f9", learning:"#4dd0e1", other:"#8b93a8" };
+  return palette[key] || "#a78bfa";
+}
+
+function seededUnit(seed){
+  // deterministic pseudo-random ในช่วง [0,1) จาก id ตายตัว — ใช้ตอนหาตำแหน่งสำรองเท่านั้น
+  let h = 2166136261;
+  const s = String(seed);
+  for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+const WEB_MAX_VISIBLE = 200; // กันหน้าจอรกเกินไปเมื่อมีความทรงจำเยอะ (เหมือนฝั่งเดสก์ท็อป)
+
+function layoutWebNodes(){
+  // จำกัดจำนวน + เรียงเก่า→ใหม่ เพื่อให้ index คงที่ตอนคำนวณมุมของวงแหวนหลัก
+  const mems = sortedMemories().slice(0, WEB_MAX_VISIBLE).reverse();
+  const shownIds = new Set(mems.map(m => m.id));
+
+  // เก็บตำแหน่งเดิมของ node ที่ยังแสดงอยู่ ไม่สนลำดับที่เปลี่ยนหลัง sync (กันจอกระพริบ/สุ่มใหม่ทั้งกระดาน)
+  const existing = {};
+  webNodes.forEach(n => { if(shownIds.has(n.id)) existing[n.id] = n; });
+
+  // แยกกลุ่ม: top-level (ไม่มี parent_id ที่แสดงอยู่) vs child ที่จะไปเกาะกลุ่มรอบพ่อแม่ของมัน
+  // — โครงสร้างนี้เหมือนฝั่งเดสก์ท็อปทุกประการ ต่างจากเดิมที่กระจายทุก node แบบสุ่มบนวงเดียว
+  const childrenOf = {};
+  const topLevel = [];
+  mems.forEach(m => {
+    const pid = m.parent_id;
+    if(pid != null && pid !== m.id && shownIds.has(pid)){
+      (childrenOf[pid] = childrenOf[pid] || []).push(m);
+    } else {
+      topLevel.push(m);
+    }
+  });
+
+  const cx = 0, cy = 0;
+  const n = Math.max(1, topLevel.length);
+  const R = Math.max(140, n * 16);
+  const CLUSTER_R = 34;
+
+  const posOf = {};
+  topLevel.forEach((m, i) => {
+    const ang = (i / n) * Math.PI * 2; // กระจายเท่าๆ กันรอบวง ไม่สุ่ม
+    posOf[m.id] = { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang) };
+    const kids = childrenOf[m.id] || [];
+    const kn = kids.length;
+    kids.forEach((k, j) => {
+      const kang = kn ? (j / kn) * Math.PI * 2 : 0;
+      posOf[k.id] = {
+        x: posOf[m.id].x + CLUSTER_R * Math.cos(kang),
+        y: posOf[m.id].y + CLUSTER_R * Math.sin(kang)
+      };
+    });
+  });
+
+  webNodes = mems.map(m => {
+    if(existing[m.id]){ existing[m.id].mem = m; return existing[m.id]; }
+    const p = posOf[m.id] || { x: cx, y: cy };
+    return { id: m.id, mem: m, x: p.x, y: p.y };
+  });
+}
+
+function renderWeb(){
+  webCanvas = document.getElementById("web-canvas");
+  const wrap = document.getElementById("web-wrap");
+  webCanvas.width = wrap.clientWidth * devicePixelRatio;
+  webCanvas.height = wrap.clientHeight * devicePixelRatio;
+  webCanvas.style.width = wrap.clientWidth + "px";
+  webCanvas.style.height = wrap.clientHeight + "px";
+  webCtx = webCanvas.getContext("2d");
+  layoutWebNodes();
+  if(webView.x===0 && webView.y===0 && webNodes.length){
+    webView.x = wrap.clientWidth/2; webView.y = wrap.clientHeight/2;
+  } else if(!webNodes.length){
+    webView.x = wrap.clientWidth/2; webView.y = wrap.clientHeight/2;
+  }
+  drawWeb();
+  attachWebEvents();
+}
+
+function drawWeb(){
+  if(!webCtx) return;
+  const ctx = webCtx, dpr = devicePixelRatio;
+  ctx.save();
+  ctx.clearRect(0,0,webCanvas.width, webCanvas.height);
+  ctx.fillStyle = "#11141b"; ctx.fillRect(0,0,webCanvas.width, webCanvas.height);
+  ctx.scale(dpr, dpr);
+  ctx.translate(webView.x, webView.y);
+  ctx.scale(webView.scale, webView.scale);
+
+  if(webNodes.length === 0){
+    ctx.restore();
+    const ctx2 = webCtx; ctx2.save(); ctx2.scale(dpr,dpr);
+    ctx2.fillStyle = "#8b93a8"; ctx2.font = "13px Noto Sans Thai, sans-serif"; ctx2.textAlign="center";
+    ctx2.fillText("ยังไม่มีความทรงจำ — เริ่มบันทึกเพื่อดูเว็บความจำ", (webCanvas.width/dpr)/2, (webCanvas.height/dpr)/2);
+    ctx2.restore();
+    return;
+  }
+
+  // links (AI-suggested connections)
+  ctx.strokeStyle = "rgba(110,139,255,0.35)"; ctx.lineWidth = 1.4/webView.scale;
+  DATA.links.forEach(l => {
+    const a = webNodes.find(n=>n.id===l.from), b = webNodes.find(n=>n.id===l.to);
+    if(a && b){ ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+  });
+
+  // parent-child cluster edges (เส้นประ) — โชว์โครงสร้างหัวข้อย่อยให้เห็นชัดว่ากลุ่มไหนอยู่ด้วยกัน
+  ctx.strokeStyle = "rgba(139,147,168,0.4)"; ctx.setLineDash([2/webView.scale, 2/webView.scale]);
+  webNodes.forEach(n => {
+    const pid = n.mem.parent_id;
+    if(pid != null){
+      const p = webNodes.find(x=>x.id===pid);
+      if(p){ ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(n.x,n.y); ctx.stroke(); }
+    }
+  });
+  ctx.setLineDash([]);
+
+  // nodes
+  webNodes.forEach(n => {
+    const r = 8 + (n.mem.importance||3)*2;
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+    ctx.fillStyle = catColor(n.mem.category); ctx.globalAlpha = n.id===webDrag?.id ? 1 : 0.88;
+    ctx.fill(); ctx.globalAlpha = 1;
+    if(n.id === selectedWebNode){ ctx.lineWidth = 2/webView.scale; ctx.strokeStyle="#fff"; ctx.stroke(); }
+    if(webView.scale > 0.55){
+      ctx.fillStyle = "#e8eaf0"; ctx.font = `${11/webView.scale}px Noto Sans Thai, sans-serif`; ctx.textAlign="center";
+      const label = (n.mem.title||"").slice(0,14);
+      ctx.fillText(label, n.x, n.y + r + 12/webView.scale);
+    }
+  });
+  ctx.restore();
+}
+
+let selectedWebNode = null;
+function screenToWorld(px, py){
+  return { x: (px - webView.x)/webView.scale, y: (py - webView.y)/webView.scale };
+}
+function nodeAt(px, py){
+  const w = screenToWorld(px, py);
+  for(let i=webNodes.length-1;i>=0;i--){
+    const n = webNodes[i]; const r = 8 + (n.mem.importance||3)*2 + 6;
+    if(Math.hypot(w.x-n.x, w.y-n.y) <= r) return n;
+  }
+  return null;
+}
+
+function attachWebEvents(){
+  if(webCanvas._bound) return;
+  webCanvas._bound = true;
+  let lastTouchDist = null, lastPan = null, dragMoved = false;
+
+  function pos(e){
+    const rect = webCanvas.getBoundingClientRect();
+    if(e.touches && e.touches.length) return { x: e.touches[0].clientX-rect.left, y: e.touches[0].clientY-rect.top };
+    return { x: e.clientX-rect.left, y: e.clientY-rect.top };
+  }
+
+  webCanvas.addEventListener("pointerdown", (e) => {
+    const p = pos(e); dragMoved = false;
+    const n = nodeAt(p.x, p.y);
+    if(n){ webDrag = n; }
+    else { webPan = { startX: p.x, startY: p.y, ox: webView.x, oy: webView.y }; }
+  });
+  webCanvas.addEventListener("pointermove", (e) => {
+    const p = pos(e);
+    if(webDrag){
+      dragMoved = true;
+      const w = screenToWorld(p.x, p.y);
+      webDrag.x = w.x; webDrag.y = w.y;
+      drawWeb();
+    } else if(webPan){
+      dragMoved = true;
+      webView.x = webPan.ox + (p.x - webPan.startX);
+      webView.y = webPan.oy + (p.y - webPan.startY);
+      drawWeb();
+    }
+  });
+  webCanvas.addEventListener("pointerup", (e) => {
+    const p = pos(e);
+    if(webDrag){
+      if(!dragMoved){ selectedWebNode = webDrag.id; drawWeb(); openWebNodeDetail(webDrag.id); }
+      else {
+        const target = nodeAt(p.x, p.y);
+        if(target && target.id !== webDrag.id) offerLink(webDrag.id, target.id);
+      }
+    }
+    webDrag = null; webPan = null;
+  });
+  webCanvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.08 : 0.93;
+    webView.scale = Math.max(0.25, Math.min(3, webView.scale*factor));
+    drawWeb();
+  }, {passive:false});
+
+  // pinch zoom (touch)
+  webCanvas.addEventListener("touchmove", (e) => {
+    if(e.touches.length === 2){
+      e.preventDefault();
+      const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      if(lastTouchDist){
+        const factor = d/lastTouchDist;
+        webView.scale = Math.max(0.25, Math.min(3, webView.scale*factor));
+        drawWeb();
+      }
+      lastTouchDist = d;
+      webDrag = null; webPan = null;
+    }
+  }, {passive:false});
+  webCanvas.addEventListener("touchend", () => { lastTouchDist = null; });
+}
+
+function webZoom(f){ webView.scale = Math.max(0.25, Math.min(3, webView.scale*f)); drawWeb(); }
+function webResetView(){
+  const wrap = document.getElementById("web-wrap");
+  webView = { x: wrap.clientWidth/2, y: wrap.clientHeight/2, scale: 1 };
+  drawWeb();
+}
+function openWebNodeDetail(id){ openEditSheet(id); }
+function offerLink(fromId, toId){
+  const reason = prompt("เชื่อมโยงความทรงจำสองรายการนี้ — ระบุเหตุผล/ความสัมพันธ์:", "เกี่ยวข้องกัน");
+  if(reason === null) return;
+  DATA.links.push({ from: fromId, to: toId, reason: reason || "เกี่ยวข้องกัน" });
+  saveData();
+  toast("เชื่อมโยงแล้ว");
+  drawWeb();
+}
+
+/* ══════════════════════════════ CHAT AI (Groq) ═══════════════════════ */
+let chatHistory = loadLocal("mnemo_mobile_chat", []);
+function renderChat(){
+  const log = document.getElementById("chat-log");
+  if(chatHistory.length === 0){
+    log.innerHTML = `<div class="msg sys">แชทกับ AI โดยอ้างอิงความทรงจำของคุณ — ลองถามเช่น "ช่วยสรุปความทรงจำเกี่ยวกับงานให้หน่อย"</div>`;
+    return;
+  }
+  log.innerHTML = chatHistory.map(m => `<div class="msg ${m.role==='user'?'user':'ai'}">${escapeHtml(m.content)}</div>`).join("");
+  document.getElementById("main").scrollTop = document.getElementById("main").scrollHeight;
+}
+function scoreMemoryRelevance(mem, queryTokens){
+  if(queryTokens.length === 0) return 0;
+  const hay = ((mem.title||"") + " " + (mem.content||"") + " " + (mem.tags||[]).join(" ")).toLowerCase();
+  let score = 0;
+  for(const t of queryTokens){ if(t && hay.includes(t)) score++; }
+  return score;
+}
+function buildMemoryContext(question){
+  const all = sortedMemories(); // ทุกความทรงจำ ไม่ใช่แค่ 40 รายการล่าสุด
+  if(all.length===0) return "ผู้ใช้ยังไม่มีความทรงจำที่บันทึกไว้";
+
+  const CONTEXT_CHAR_BUDGET = 18000; // งบตัวอักษรรวม กันเกิน rate limit ของ Groq free tier
+  const NOTE_CHAR_CAP = 350;         // ต่อรายการ (เดิม 150 ตัวอักษรสั้นเกินไป ตัดเนื้อหาสำคัญทิ้งบ่อย)
+
+  const queryTokens = (question||"").toLowerCase().split(/\s+/).filter(t => t.length>=2);
+  const scored = all.map(m => ({ m, score: scoreMemoryRelevance(m, queryTokens) }));
+  // เรียงตามความเกี่ยวข้องกับคำถามก่อน แล้วค่อยตามความใหม่ — กันปัญหา "อ่านความจำไม่หมด/ไม่ครบ"
+  // ตอนถามถึงเรื่องเก่าที่ไม่ได้อยู่ใน 40 รายการล่าสุด
+  scored.sort((a,b) => (b.score-a.score) || (b.m.date||"").localeCompare(a.m.date||""));
+
+  const picked = [];
+  let used = 0;
+  for(const {m} of scored){
+    const content = m.content || "";
+    const clipped = content.slice(0, NOTE_CHAR_CAP) + (content.length>NOTE_CHAR_CAP ? "…" : "");
+    const line = `- [${m.date}] (${catLabel(m.category)}) ${m.title}: ${clipped}`;
+    if(used + line.length > CONTEXT_CHAR_BUDGET) break;
+    picked.push({ m, line });
+    used += line.length;
+  }
+  picked.sort((a,b) => (b.m.date||"").localeCompare(a.m.date||"")); // แสดงผลใหม่→เก่า อ่านง่ายกว่า
+  const header = picked.length < all.length
+    ? `(นี่คือ ${picked.length} รายการจากทั้งหมด ${all.length} รายการ ที่เกี่ยวข้องกับคำถามมากที่สุด — ถ้าคำตอบดูไม่ครบ ให้ผู้ใช้ลองถามให้เจาะจงมากขึ้น)\n`
+    : "";
+  return header + picked.map(p=>p.line).join("\n");
+}
+async function sendChat(){
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if(!text) return;
+  if(!CFG.groq_key){ toast("กรุณาตั้งค่า Groq API Key ในหน้าตั้งค่าก่อน"); showView("settings"); return; }
+  chatHistory.push({ role:"user", content: text });
+  input.value = "";
+  renderChat();
+  const thinkingIdx = chatHistory.push({ role:"assistant", content: "…กำลังคิด" }) - 1;
+  renderChat();
+  try{
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${CFG.groq_key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: "คุณคือผู้ช่วย AI ของแอป MNEMO ที่ช่วยผู้ใช้ทบทวนและวิเคราะห์ความทรงจำส่วนตัวของตัวเอง ตอบเป็นภาษาไทยอย่างกระชับและเป็นกันเอง โดยอ้างอิงจากบันทึกความทรงจำต่อไปนี้:\n\n" + buildMemoryContext(text) },
+          ...chatHistory.slice(0,-1).map(m=>({role:m.role, content:m.content})),
+        ],
+      }),
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      throw new Error(`${res.status}: ${errText.slice(0,150)}`);
+    }
+    const j = await res.json();
+    const reply = j.choices?.[0]?.message?.content || "(ไม่มีคำตอบ)";
+    chatHistory[thinkingIdx] = { role:"assistant", content: reply };
+    saveLocal("mnemo_mobile_chat", chatHistory);
+    renderChat();
+    if(CFG.tts_enabled) speakText(reply);
+  }catch(e){
+    chatHistory[thinkingIdx] = { role:"assistant", content: "ขออภัย เกิดข้อผิดพลาด: " + e.message +
+      (e.message.includes("Failed to fetch") ? "\n(อาจเกิดจากเบราว์เซอร์บล็อก CORS — ลองใช้แชทบนโปรแกรมเดสก์ท็อปแทนถ้าเกิดปัญหานี้ซ้ำ)" : "") };
+    renderChat();
+  }
+}
+document.getElementById("chat-input").addEventListener("keydown", (e) => { if(e.key==="Enter") sendChat(); });
+
+function speakText(text){
+  if(!("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "th-TH";
+  const voices = speechSynthesis.getVoices();
+  const thVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith("th"));
+  if(thVoice) u.voice = thVoice;
+  speechSynthesis.speak(u);
+}
+
+/* chat mic (พูดแทนพิมพ์ในหน้าแชท) */
+let chatRecognition = null, chatMicActive = false;
+function toggleChatMic(){
+  if(chatMicActive){ chatMicActive=false; if(chatRecognition) try{chatRecognition.stop();}catch(e){}; document.getElementById("chat-mic-btn").classList.remove("recording"); return; }
+  chatRecognition = getSpeechRecognition();
+  if(!chatRecognition){ toast("เบราว์เซอร์นี้ไม่รองรับการพูด"); return; }
+  chatMicActive = true;
+  document.getElementById("chat-mic-btn").classList.add("recording");
+  chatRecognition.onresult = (e) => {
+    let text = ""; for(let i=e.resultIndex;i<e.results.length;i++) text += e.results[i][0].transcript;
+    document.getElementById("chat-input").value = text;
+  };
+  chatRecognition.onerror = () => { chatMicActive=false; document.getElementById("chat-mic-btn").classList.remove("recording"); };
+  chatRecognition.onend = () => {
+    if(chatMicActive){ chatMicActive=false; document.getElementById("chat-mic-btn").classList.remove("recording"); sendChat(); }
+  };
+  try{ chatRecognition.start(); }catch(e){}
+}
+
+/* ══════════════════════════════ SETTINGS ═════════════════════════════ */
+function toggleSwitch(id){
+  const el = document.getElementById(id);
+  el.classList.toggle("on");
+}
+function loadSettingsUI(){
+  document.getElementById("cfg-repo").value = CFG.github_repo || "";
+  document.getElementById("cfg-token").value = CFG.github_token || "";
+  document.getElementById("cfg-branch").value = CFG.github_branch || "main";
+  document.getElementById("cfg-groq").value = CFG.groq_key || "";
+  document.getElementById("sw-github").classList.toggle("on", !!CFG.github_sync_enabled);
+  document.getElementById("sw-tts").classList.toggle("on", !!CFG.tts_enabled);
+}
+function saveSettings(){
+  CFG.github_repo = document.getElementById("cfg-repo").value.trim();
+  CFG.github_token = document.getElementById("cfg-token").value.trim();
+  CFG.github_branch = document.getElementById("cfg-branch").value.trim() || "main";
+  CFG.groq_key = document.getElementById("cfg-groq").value.trim();
+  CFG.github_sync_enabled = document.getElementById("sw-github").classList.contains("on");
+  CFG.tts_enabled = document.getElementById("sw-tts").classList.contains("on");
+  saveConfig();
+  const el = document.getElementById("settings-saved");
+  el.style.display = "block";
+  setTimeout(()=>{ el.style.display="none"; }, 1800);
+  pullIfNewer();
+}
+
+/* ══════════════════════════════ PWA INSTALL ══════════════════════════ */
+let deferredInstallPrompt = null;
+function isStandalone(){
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+function isIOS(){
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+function refreshInstallUI(){
+  const row = document.getElementById("install-row");
+  const iosHint = document.getElementById("install-ios-hint");
+  const doneHint = document.getElementById("install-done-hint");
+  if(!row) return;
+  if(isStandalone()){
+    row.style.display = "none"; iosHint.style.display = "none"; doneHint.style.display = "block";
+  } else if(deferredInstallPrompt){
+    row.style.display = "block"; iosHint.style.display = "none"; doneHint.style.display = "none";
+  } else if(isIOS()){
+    row.style.display = "none"; iosHint.style.display = "block"; doneHint.style.display = "none";
+  } else {
+    row.style.display = "none"; iosHint.style.display = "none"; doneHint.style.display = "none";
+  }
+}
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  refreshInstallUI();
+});
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  refreshInstallUI();
+  toast("ติดตั้งแอปสำเร็จ ✓");
+});
+async function installApp(){
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  refreshInstallUI();
+}
+
+/* ══════════════════════════════ INIT ═════════════════════════════════ */
+function refreshCurrentView(){
+  if(currentView==="timeline") renderTimeline();
+  else if(currentView==="search") renderSearch();
+  else if(currentView==="web") renderWeb();
+  // chat ไม่ต้อง re-render เอง — ข้อความเก่ายังอยู่ครบ แค่ context ที่ใช้ถามครั้งถัดไปจะใหม่ขึ้นเอง
+}
+
+const AUTO_SYNC_INTERVAL_MS = 20000; // เช็คทุก 20 วินาที ระหว่างเปิดหน้าค้างไว้ ให้เห็นข้อมูล/การลบจากอีกเครื่องโดยไม่ต้อง reload
+let autoSyncTimer = null;
+let autoSyncBusy = false;
+async function autoSyncTick(){
+  if(!autoSyncBusy && ghConfigured() && document.visibilityState === "visible"){
+    autoSyncBusy = true;
+    try{
+      const changed = await pullIfNewer();
+      if(changed) refreshCurrentView();
+    } finally {
+      autoSyncBusy = false;
+    }
+  }
+}
+function startAutoSync(){
+  if(autoSyncTimer) clearInterval(autoSyncTimer);
+  autoSyncTimer = setInterval(autoSyncTick, AUTO_SYNC_INTERVAL_MS);
+}
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "visible") autoSyncTick(); // กลับมาเปิดแอป/แท็บ → ดึงข้อมูลล่าสุดทันที
+});
+
+window.addEventListener("load", async () => {
+  if(!DATA.categories) DATA.categories = {};
+  if(!DATA.links) DATA.links = [];
+  if(!DATA.trash) DATA.trash = [];
+  if(!DATA.meta) DATA.meta = { updated_at: "" };
+  loadSettingsUI();
+  refreshInstallUI();
+  renderTimeline();
+  if(ghConfigured()){ await pullIfNewer(); renderTimeline(); }
+  startAutoSync();
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  }
+});
+window.addEventListener("beforeunload", () => { if(pushTimer) doPush(); });
+</script>
+</body>
+</html>
